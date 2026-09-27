@@ -33,6 +33,21 @@ class DataFetchError(Exception):
 _CACHE: dict[tuple, tuple[float, pd.DataFrame, bool]] = {}
 
 
+def _make_browser_session():
+    """
+    Yahoo Finance, Railway/Render gibi paylaşımlı bulut sunuculardan gelen
+    istekleri sıklıkla "bot trafiği" sayıp engelliyor. curl_cffi, gerçek bir
+    Chrome tarayıcısının TLS parmak izini taklit ederek bu tespiti bazen
+    atlatabiliyor. Bu bir GARANTİ değil -- Yahoo yine de engelleyebilir,
+    ama hiç denememekten daha iyi bir şans veriyor.
+    """
+    try:
+        from curl_cffi import requests as curl_requests
+        return curl_requests.Session(impersonate="chrome")
+    except Exception:
+        return None  # curl_cffi yoksa veya hata verirse normal yfinance oturumuna düş
+
+
 def normalize_ticker(ticker: str, market: str = DEFAULT_MARKET) -> str:
     suffix = MARKETS.get(market, MARKETS[DEFAULT_MARKET])["suffix"]
     ticker = ticker.strip().upper()
@@ -57,7 +72,11 @@ def fetch_ohlcv(
         return cached[1], cached[2]
 
     try:
-        df = yf.download(symbol, period=period, interval=interval, progress=False, auto_adjust=True)
+        session = _make_browser_session()
+        kwargs = {"period": period, "interval": interval, "progress": False, "auto_adjust": True}
+        if session is not None:
+            kwargs["session"] = session
+        df = yf.download(symbol, **kwargs)
         if df is None or df.empty:
             raise DataFetchError(f"'{symbol}' için veri bulunamadı.")
 
