@@ -22,10 +22,17 @@ DEFAULT_MARKET = "us"
 # üretilsin mi? Geliştirme / test ortamında True, production'da False öner.
 ALLOW_SYNTHETIC_FALLBACK = os.getenv("ALLOW_SYNTHETIC_FALLBACK", "true").lower() == "true"
 
+# ABD (NASDAQ/NYSE) verisi için Twelve Data resmi API'si kullanılır -- Yahoo
+# Finance (yfinance) bulut sunuculardan (Railway/Render vb.) sıkça
+# engellendiği için bu daha güvenilir. Anahtar KESİNLİKLE kod içine
+# yazılmaz, sadece ortam değişkeninden (Railway > Variables) okunur.
+# Ücretsiz plan BIST'i desteklemediği için BIST hâlâ yfinance kullanır.
+TWELVE_DATA_API_KEY = os.getenv("TWELVE_DATA_API_KEY", "")
+
 # Aynı hisse/dönem için tekrar tekrar Yahoo Finance'e gitmemek için basit
 # bir bellek-içi önbellek. Gerçek trafikte hem hızı artırır hem de dış API'nin
 # seni geçici olarak engellemesini (rate limit) önler.
 CACHE_TTL_SECONDS = int(os.getenv("CACHE_TTL_SECONDS", 15 * 60))
 
 # CORS - frontend'ini farklı bir origin'den servis ediyorsan burayı düzenle
-ALLOWED_ORIGINS = ["https://dynamic-meringue-fc4904.netlify.app"]
+ALLOWED_ORIGINS = ["*"]
