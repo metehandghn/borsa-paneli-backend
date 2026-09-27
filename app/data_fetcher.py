@@ -8,8 +8,13 @@ VERİ KAYNAĞI STRATEJİSİ:
   doğrulanmış bir sorun (curl_cffi ile tarayıcı taklidi bile çözmedi).
   Twelve Data resmi, API-anahtarlı bir servis olduğu için bu riski taşımıyor.
 - BIST: Twelve Data'nın ücretsiz planı BIST'i desteklemiyor (ücretli plan
-  gerektiriyor), bu yüzden BIST hâlâ yfinance kullanıyor. Bulut sunucudan
-  bazen engellenebilir; bu durumda dürüstçe DEMO veriye düşülür.
+  gerektiriyor). Bunun yerine, birincil kaynak olarak "borsapy" kütüphanesi
+  kullanılır -- bu, Yahoo yerine TradingView WebSocket API'sini kaynak
+  aldığı için Yahoo'nun bulut-sunucu engellemesinden BAĞIMSIZDIR. Kişisel/
+  eğitim amaçlı kullanım için ücretsizdir (projemizin niteliğiyle uyumlu).
+  borsapy başarısız olursa yfinance'e, o da başarısız olursa dürüst bir
+  DEMO uyarısıyla sahte veriye düşülür. Üç katmanlı bu yedekleme, tek bir
+  kaynağın kırılganlığına bağımlı kalmamak içindir.
 
 ÖNBELLEK: Gerçek trafikte aynı hisseyi kısa sürede tekrar tekrar sorgulamak
 hem yavaştır hem de dış API'lerin seni geçici engellemesine yol açabilir.
@@ -87,8 +92,25 @@ def _fetch_from_twelvedata(symbol: str, period: str, interval: str) -> pd.DataFr
     return df[["Open", "High", "Low", "Close", "Volume"]]
 
 
+def _fetch_from_borsapy(raw_ticker: str, period: str, interval: str) -> pd.DataFrame:
+    """
+    BIST için birincil kaynak. TradingView WebSocket'ini kullanır -- Yahoo
+    Finance'e hiç dokunmaz, bu yüzden Yahoo'nun bulut-sunucu engellemesinden
+    etkilenmez. Ticker'da ".IS" eki OLMAMALI (borsapy düz kod bekler).
+    """
+    import borsapy as bp
+    df = bp.Ticker(raw_ticker).history(period=period, interval=interval)
+    if df is None or df.empty:
+        raise DataFetchError(f"'{raw_ticker}' için borsapy'den veri alınamadı.")
+    needed = ["Open", "High", "Low", "Close", "Volume"]
+    missing = [c for c in needed if c not in df.columns]
+    if missing:
+        raise DataFetchError(f"borsapy beklenmeyen bir format döndürdü (eksik sütun: {missing}).")
+    return df[needed]
+
+
 def _make_browser_session():
-    """BIST (yfinance) için tarayıcı taklidi -- garanti değil ama şansı artırır."""
+    """yfinance (yedek BIST kaynağı) için tarayıcı taklidi -- garanti değil ama şansı artırır."""
     try:
         from curl_cffi import requests as curl_requests
         return curl_requests.Session(impersonate="chrome")
@@ -127,6 +149,12 @@ def fetch_ohlcv(
     try:
         if market == "us" and TWELVE_DATA_API_KEY:
             df = _fetch_from_twelvedata(symbol, period, interval)
+        elif market == "bist":
+            raw_ticker = ticker.strip().upper()
+            try:
+                df = _fetch_from_borsapy(raw_ticker, period, interval)
+            except Exception:
+                df = _fetch_from_yfinance(symbol, period, interval)  # yedek kaynak
         else:
             df = _fetch_from_yfinance(symbol, period, interval)
 
@@ -160,3 +188,4 @@ def _synthetic_ohlcv(symbol: str, n: int = 180) -> pd.DataFrame:
         {"Open": open_, "High": high, "Low": low, "Close": price, "Volume": volume},
         index=dates,
     )
+
