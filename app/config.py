@@ -28,4 +28,4 @@ ALLOW_SYNTHETIC_FALLBACK = os.getenv("ALLOW_SYNTHETIC_FALLBACK", "true").lower()
 CACHE_TTL_SECONDS = int(os.getenv("CACHE_TTL_SECONDS", 15 * 60))
 
 # CORS - frontend'ini farklı bir origin'den servis ediyorsan burayı düzenle
-ALLOWED_ORIGINS = ["*"]
+ALLOWED_ORIGINS = ["https://dynamic-meringue-fc4904.netlify.app"]
