@@ -5,6 +5,8 @@ pandas
 numpy
 yfinance
 curl_cffi
+borsapy
+requests
 opencv-python-headless
 python-multipart
 pydantic
