@@ -1,1 +1,9 @@
-fastapi uvicorn[standard] sqlalchemy pandas numpy yfinance opencv-python-headless python-multipart pydantic
+fastapi
+uvicorn[standard]
+sqlalchemy
+pandas
+numpy
+yfinance
+opencv-python-headless
+python-multipart
+pydantic
