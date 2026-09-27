@@ -4,6 +4,7 @@ sqlalchemy
 pandas
 numpy
 yfinance
+curl_cffi
 opencv-python-headless
 python-multipart
 pydantic
