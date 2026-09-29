@@ -209,7 +209,12 @@ def fetch_ohlcv(
             except Exception as e1:
                 print(f"[BIST kaynak 1/3 basarisiz] borsapy: {type(e1).__name__}: {e1}")
                 try:
-                    df = _fetch_from_isyatirimhisse(raw_ticker, period)
+                    try:
+                        df = _fetch_from_isyatirimhisse(raw_ticker, period)
+                    except Exception:
+                        # "Read timed out" genelde gecici bir gecikme --
+                        # bir kez daha denemek cogu zaman yeterli.
+                        df = _fetch_from_isyatirimhisse(raw_ticker, period)
                 except Exception as e2:
                     print(f"[BIST kaynak 2/3 basarisiz] isyatirimhisse: {type(e2).__name__}: {e2}")
                     try:
