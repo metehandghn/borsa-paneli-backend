@@ -56,8 +56,11 @@ def analyze_ticker(
     )
     if is_synthetic:
         response.disclaimer += (
-            " UYARI: Canlı borsa verisine bu ortamdan erişilemediği için DEMO "
-            "(rastgele üretilmiş) veri kullanıldı — bu sonuç gerçek fiyatı yansıtmaz. "
-            "Kendi sunucunda çalıştırdığında gerçek veri gelecektir."
+            " UYARI: Hiçbir kaynaktan gerçek veri alınamadığı için DEMO (rastgele "
+            "üretilmiş) veri kullanıldı — bu sonuç gerçek fiyatı yansıtmaz. Bunun "
+            "iki olası sebebi var: (1) hisse kodunu yanlış yazmış olabilirsin -- "
+            "şirket adı değil BORSA KODUNU kullan (örn. Aselsan değil ASELS), "
+            "ya da (2) veri kaynakları o an geçici olarak erişilemez olabilir. "
+            "Kodu kontrol edip tekrar denemeni öneririz."
         )
     return response
