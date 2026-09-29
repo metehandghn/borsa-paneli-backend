@@ -7,14 +7,21 @@ VERİ KAYNAĞI STRATEJİSİ:
   istekleri sıklıkla "bot trafiği" sayıp engelliyor -- bu, denenmiş ve
   doğrulanmış bir sorun (curl_cffi ile tarayıcı taklidi bile çözmedi).
   Twelve Data resmi, API-anahtarlı bir servis olduğu için bu riski taşımıyor.
-- BIST: Twelve Data'nın ücretsiz planı BIST'i desteklemiyor (ücretli plan
-  gerektiriyor). Bunun yerine, birincil kaynak olarak "borsapy" kütüphanesi
-  kullanılır -- bu, Yahoo yerine TradingView WebSocket API'sini kaynak
-  aldığı için Yahoo'nun bulut-sunucu engellemesinden BAĞIMSIZDIR. Kişisel/
-  eğitim amaçlı kullanım için ücretsizdir (projemizin niteliğiyle uyumlu).
-  borsapy başarısız olursa yfinance'e, o da başarısız olursa dürüst bir
-  DEMO uyarısıyla sahte veriye düşülür. Üç katmanlı bu yedekleme, tek bir
-  kaynağın kırılganlığına bağımlı kalmamak içindir.
+- BIST: Twelve Data'nın ücretsiz planı BIST'i desteklemiyor (ücretli "Grow"
+  planı yılda ~$948 -- kanıtlanmış bir tahmin gücü olmayan bir hobi projesi
+  için gerekçesiz bir maliyet). Bunun yerine DÖRT KATMANLI, tamamen ücretsiz
+  bir yedekleme zinciri kullanılır, her biri farklı bir kaynağa dayanır ki
+  tek bir kaynağın kırılganlığına bağımlı kalınmasın:
+    1. borsapy      -> TradingView WebSocket (Yahoo'dan bağımsız)
+    2. isyatirimhisse -> İş Yatırım'ın kendi API'si (TradingView'den de
+       bağımsız, farklı bir sunucu/altyapı). Bu kaynakta "Open" (açılış)
+       fiyatı yok, bir önceki günün kapanışıyla yaklaşıklanır -- göstergeler
+       (RSI/MACD/Bollinger/Stochastic vb.) zaten Open'a değil Close'a dayalı
+       olduğu için bu, sinyal kalitesini etkilemez. Hacim de TL cirosu
+       olarak gelir (hisse adedi değil); göstergelerimiz hacmi hep GÖRECELİ
+       (bugün/ortalama) kullandığı için bu da sorun yaratmaz.
+    3. yfinance     -> Yahoo Finance (bulut sunucudan sık engelleniyor)
+    4. Hiçbiri çalışmazsa dürüst bir DEMO uyarısıyla sahte veriye düşülür.
 
 ÖNBELLEK: Gerçek trafikte aynı hisseyi kısa sürede tekrar tekrar sorgulamak
 hem yavaştır hem de dış API'lerin seni geçici engellemesine yol açabilir.
@@ -94,7 +101,7 @@ def _fetch_from_twelvedata(symbol: str, period: str, interval: str) -> pd.DataFr
 
 def _fetch_from_borsapy(raw_ticker: str, period: str, interval: str) -> pd.DataFrame:
     """
-    BIST için birincil kaynak. TradingView WebSocket'ini kullanır -- Yahoo
+    BIST için 1. katman. TradingView WebSocket'ini kullanır -- Yahoo
     Finance'e hiç dokunmaz, bu yüzden Yahoo'nun bulut-sunucu engellemesinden
     etkilenmez. Ticker'da ".IS" eki OLMAMALI (borsapy düz kod bekler).
     """
@@ -107,6 +114,52 @@ def _fetch_from_borsapy(raw_ticker: str, period: str, interval: str) -> pd.DataF
     if missing:
         raise DataFetchError(f"borsapy beklenmeyen bir format döndürdü (eksik sütun: {missing}).")
     return df[needed]
+
+
+def _period_to_daterange(period: str) -> tuple[str, str]:
+    """'6mo','2y','5y' gibi bir dönemi isyatirimhisse'nin beklediği dd-mm-yyyy tarih aralığına çevirir."""
+    from datetime import datetime, timedelta
+    m = re.match(r"(\d+)(mo|y)", period.strip().lower())
+    if not m:
+        days = 200
+    else:
+        n, unit = int(m.group(1)), m.group(2)
+        days = n * 31 if unit == "mo" else n * 366
+    end = datetime.now()
+    start = end - timedelta(days=days + 15)
+    return start.strftime("%d-%m-%Y"), end.strftime("%d-%m-%Y")
+
+
+def _fetch_from_isyatirimhisse(raw_ticker: str, period: str) -> pd.DataFrame:
+    """
+    BIST için 2. katman. İş Yatırım'ın kendi API'sini kullanır -- borsapy'nin
+    kaynağı TradingView'den TAMAMEN BAĞIMSIZ bir sunucu/altyapı, bu yüzden
+    TradingView engellense bile bu çalışabilir. "Open" alanı bu API'de yok,
+    bir önceki günün kapanışıyla yaklaşıklanır (göstergelerimiz Open'a değil
+    Close'a dayalı olduğu için etkisi yok). Hacim TL cirosu olarak gelir,
+    hisse adedi değil -- göstergelerimiz hacmi hep GÖRECELİ kullandığı için
+    (bugün/ortalama oranı) bu da sinyal kalitesini etkilemez.
+    """
+    from isyatirimhisse import fetch_stock_data
+    start_date, end_date = _period_to_daterange(period)
+    df = fetch_stock_data(raw_ticker, start_date=start_date, end_date=end_date)
+    if df is None or df.empty:
+        raise DataFetchError(f"'{raw_ticker}' için isyatirimhisse'den veri alınamadı.")
+
+    needed_raw = ["HGDG_TARIH", "HGDG_KAPANIS", "HGDG_MAX", "HGDG_MIN", "HGDG_HACIM"]
+    missing = [c for c in needed_raw if c not in df.columns]
+    if missing:
+        raise DataFetchError(f"isyatirimhisse beklenmeyen bir format döndürdü (eksik: {missing}).")
+
+    df = df.set_index("HGDG_TARIH").sort_index()
+    out = pd.DataFrame(index=df.index)
+    out["Close"] = pd.to_numeric(df["HGDG_KAPANIS"], errors="coerce")
+    out["High"] = pd.to_numeric(df["HGDG_MAX"], errors="coerce")
+    out["Low"] = pd.to_numeric(df["HGDG_MIN"], errors="coerce")
+    out["Open"] = out["Close"].shift(1)
+    out["Open"] = out["Open"].fillna(out["Close"])
+    out["Volume"] = pd.to_numeric(df["HGDG_HACIM"], errors="coerce")
+    return out[["Open", "High", "Low", "Close", "Volume"]]
 
 
 def _make_browser_session():
@@ -154,7 +207,10 @@ def fetch_ohlcv(
             try:
                 df = _fetch_from_borsapy(raw_ticker, period, interval)
             except Exception:
-                df = _fetch_from_yfinance(symbol, period, interval)  # yedek kaynak
+                try:
+                    df = _fetch_from_isyatirimhisse(raw_ticker, period)
+                except Exception:
+                    df = _fetch_from_yfinance(symbol, period, interval)  # son yedek
         else:
             df = _fetch_from_yfinance(symbol, period, interval)
 
