@@ -223,9 +223,13 @@ def fetch_ohlcv(
     except Exception as exc:
         if not ALLOW_SYNTHETIC_FALLBACK:
             raise DataFetchError(str(exc)) from exc
-        synth = _synthetic_ohlcv(symbol)
-        _CACHE[cache_key] = (now, synth, True)
-        return synth, True
+        # NOT: sahte (demo) veri BİLEREK önbelleğe alınmıyor. Daha önce bu
+        # önbelleğe alınıyordu ve geçici bir aksaklık 15 dakika boyunca
+        # "donup kalıyordu" -- gerçek kaynaklar hemen sonra düzelse bile
+        # eski demo sonucu gösterilmeye devam ediyordu. Şimdi her istekte
+        # gerçek kaynaklar yeniden denenir, demo sadece o anlık yanıt için
+        # kullanılır.
+        return _synthetic_ohlcv(symbol), True
 
 
 def _synthetic_ohlcv(symbol: str, n: int = 180) -> pd.DataFrame:
