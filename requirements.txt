@@ -6,6 +6,7 @@ numpy
 yfinance
 curl_cffi
 borsapy
+isyatirimhisse
 requests
 opencv-python-headless
 python-multipart
