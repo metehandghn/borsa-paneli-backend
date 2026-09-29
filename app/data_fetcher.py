@@ -206,11 +206,17 @@ def fetch_ohlcv(
             raw_ticker = ticker.strip().upper()
             try:
                 df = _fetch_from_borsapy(raw_ticker, period, interval)
-            except Exception:
+            except Exception as e1:
+                print(f"[BIST kaynak 1/3 basarisiz] borsapy: {type(e1).__name__}: {e1}")
                 try:
                     df = _fetch_from_isyatirimhisse(raw_ticker, period)
-                except Exception:
-                    df = _fetch_from_yfinance(symbol, period, interval)  # son yedek
+                except Exception as e2:
+                    print(f"[BIST kaynak 2/3 basarisiz] isyatirimhisse: {type(e2).__name__}: {e2}")
+                    try:
+                        df = _fetch_from_yfinance(symbol, period, interval)
+                    except Exception as e3:
+                        print(f"[BIST kaynak 3/3 basarisiz] yfinance: {type(e3).__name__}: {e3}")
+                        raise
         else:
             df = _fetch_from_yfinance(symbol, period, interval)
 
@@ -221,6 +227,7 @@ def fetch_ohlcv(
         _CACHE[cache_key] = (now, df, False)
         return df, False
     except Exception as exc:
+        print(f"[DEMO'YA DUSULDU] {market}/{symbol}: son hata -> {type(exc).__name__}: {exc}")
         if not ALLOW_SYNTHETIC_FALLBACK:
             raise DataFetchError(str(exc)) from exc
         # NOT: sahte (demo) veri BİLEREK önbelleğe alınmıyor. Daha önce bu
