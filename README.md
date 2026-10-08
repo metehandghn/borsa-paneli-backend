@@ -1,4 +1,5 @@
 # Borsa Analiz Paneli
+<img width="1912" height="1097" alt="image" src="https://github.com/user-attachments/assets/8915e950-5673-44a3-a3f2-9feb9c6041dd" />
 
 **Canlı site:** https://dynamic-meringue-fc4904.netlify.app
 
