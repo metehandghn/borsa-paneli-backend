@@ -31,3 +31,4 @@ A technical analysis dashboard for Turkish (BIST) and US (NASDAQ/NYSE) stocks th
 **Key finding:** in train/test validated experiments across both markets and many tickers, the hit rate was statistically indistinguishable from a coin flip (about 50%). The dashboard is therefore presented as an indicator reader, not a prediction tool. Not investment advice.
 
 **Stack:** Python and FastAPI backend, single-file HTML/CSS/JS frontend. Data via Twelve Data (US) and borsapy/TradingView (BIST).
+
